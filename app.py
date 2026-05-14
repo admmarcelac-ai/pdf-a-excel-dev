@@ -32,24 +32,27 @@ if archivo:
         cuit_receptor = cuits[1] if len(cuits) > 1 else ""
 
         # =========================
-        # ✅ RAZONES SOCIALES
+        # ✅ RAZONES SOCIALES (CORREGIDO)
         # =========================
 
-        # Emisor
-        emisor_match = re.search(r"Razón Social:\s*([A-Z0-9 .]+)", texto)
-        razon_emisor = emisor_match.group(1).strip() if emisor_match else ""
-
-        # Receptor (línea que contiene el CUIT receptor)
+        razon_emisor = ""
         razon_receptor = ""
-        lineas_texto = texto.split("\n")
 
-        for i, l in enumerate(lineas_texto):
-            if cuit_receptor in l and i > 0:
-                razon_receptor = lineas_texto[i-1].strip()
-                break
+        lineas_texto = [l.strip() for l in texto.split("\n") if l.strip()]
+
+        for linea in lineas_texto:
+            if ("SRL" in linea or "S.A" in linea or "SA" in linea):
+
+                # evitar líneas basura
+                if len(linea) > 4 and not linea.startswith("IVA"):
+
+                    if not razon_emisor:
+                        razon_emisor = linea
+                    elif not razon_receptor and linea != razon_emisor:
+                        razon_receptor = linea
 
         # =========================
-        # ✅ PV + NÚMERO
+        # ✅ PV + Nº
         # =========================
 
         match = re.search(r"Punto de Venta:\s*Comp\.?\s*Nro:\s*(\d+)\s*(\d+)", texto)
@@ -81,6 +84,7 @@ if archivo:
 
             if "unidades" in linea:
 
+                # ✅ cantidad corregida
                 match_cant = re.search(r"X\s*(\d+),", linea)
                 if match_cant:
                     num = match_cant.group(1)
@@ -99,6 +103,7 @@ if archivo:
 
                 producto = " ".join(descripcion).strip()
 
+                # limpieza final
                 if "Subtotal" in producto:
                     producto = producto.split("Subtotal")[-1]
 
