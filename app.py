@@ -13,6 +13,16 @@ if archivo:
     texto = reader.pages[0].extract_text()
 
     if texto:
+        # ✅ EXTRAER DATOS GENERALES (ANTES DE CORTAR)
+        fecha = re.search(r"\d{2}/\d{2}/\d{4}", texto)
+        fecha = fecha.group(0) if fecha else ""
+
+        pv = re.search(r"Punto de Venta:\s*(\d+)", texto)
+        punto_venta = pv.group(1) if pv else ""
+
+        nro = re.search(r"Comp\.?\s*Nro:\s*\d+\s*(\d+)", texto)
+        numero = nro.group(1) if nro else ""
+
         # ✅ cortar encabezado
         if "Código Producto" in texto:
             texto = texto.split("Código Producto", 1)[1]
@@ -28,19 +38,17 @@ if archivo:
 
         for linea in lineas:
 
-            # ✅ detectar líneas de producto reales
+            # ✅ detectar líneas reales de producto
             if "unidades" in linea:
 
-                # ✅ cantidad corregida (148 → 48)
+                # ✅ cantidad corregida
                 match = re.search(r"X\s*(\d+),", linea)
-
                 if match:
-                    numero = match.group(1)
-                    cantidad = int(numero[-2:])  # ← CLAVE
+                    numero_raw = match.group(1)
+                    cantidad = int(numero_raw[-2:])
                 else:
                     cantidad = 0
 
-                # ✅ extraer números
                 numeros = re.findall(r"\d+,\d+", linea)
 
                 if len(numeros) >= 4:
@@ -52,11 +60,13 @@ if archivo:
 
                 producto = " ".join(descripcion).strip()
 
-                # ✅ limpiar encabezado basura
                 if "Subtotal" in producto:
                     producto = producto.split("Subtotal")[-1]
 
                 filas.append({
+                    "Fecha": fecha,
+                    "Punto de Venta": punto_venta,
+                    "Número": numero,
                     "Producto": producto,
                     "Cantidad": cantidad,
                     "Precio Unitario": precio,
@@ -67,11 +77,9 @@ if archivo:
                 descripcion = []
 
             else:
-                # ✅ evitar encabezado
                 if "Código" not in linea and "Subtotal" not in linea:
                     descripcion.append(linea)
 
-        # ✅ salida
         if filas:
             df = pd.DataFrame(filas)
             st.dataframe(df)
