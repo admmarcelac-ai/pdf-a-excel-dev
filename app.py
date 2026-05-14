@@ -37,7 +37,7 @@ def procesar_pdf(archivo):
     cuit_receptor = cuits[1] if len(cuits) > 1 else ""
 
     # =========================
-    # ✅ RAZÓN EMISOR (FIX DEFINITIVO)
+    # ✅ RAZÓN EMISOR (FIX FINAL)
     # =========================
 
     razon_emisor = ""
@@ -50,7 +50,6 @@ def procesar_pdf(archivo):
     if match_rs:
         razon_emisor = match_rs.group(1).strip()
 
-    # fallback si no encuentra bien
     if not razon_emisor:
         for linea in texto.split("\n"):
             if ("SRL" in linea or "S.A" in linea or "SA" in linea):
@@ -87,6 +86,7 @@ def procesar_pdf(archivo):
         texto = texto.split("Código Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
+
     buffer_desc = []
 
     for linea in lineas:
@@ -95,24 +95,23 @@ def procesar_pdf(archivo):
 
             numeros = re.findall(r"\d+,\d+", linea)
 
-            # ✅ detectar PAPUS (X)
+            # ✅ CANTIDAD BIEN CORREGIDA (NUEVO FIX)
+            match_cant = re.search(r"(\d+),\d+\s+unidades", linea)
+
+            if match_cant:
+                cantidad = int(match_cant.group(1))
+            else:
+                cantidad = 0
+
+            # ✅ detectar PAPUS (para producto)
             match_x = re.search(r"X\s*(\d+),", linea)
 
             if match_x:
-                num = match_x.group(1)
-                cantidad = int(num[-2:])  # corrige 148 → 48
-
                 producto = " ".join(buffer_desc).strip()
-
             else:
-                if numeros:
-                    cantidad = int(float(numeros[0].replace(",", ".")))
-                else:
-                    cantidad = 0
-
                 producto = re.split(r"\d+,\d+", linea)[0].strip()
 
-            # ✅ importes
+            # ✅ IMPORTES
             if len(numeros) >= 4:
                 precio = float(numeros[1].replace(",", "."))
                 subtotal = float(numeros[3].replace(",", "."))
