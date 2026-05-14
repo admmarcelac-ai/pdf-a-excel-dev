@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - PRO FINAL")
+st.title("PDF a Excel - PRO FINAL ESTABLE")
 
 archivos = st.file_uploader(
     "Subí PDFs",
@@ -32,7 +32,6 @@ def procesar_pdf(archivo):
     tipo = tipo.group(1) if tipo else ""
 
     cuits = re.findall(r"\d{11}", texto)
-
     cuit_emisor = cuits[0] if len(cuits) > 0 else ""
     cuit_receptor = cuits[1] if len(cuits) > 1 else ""
 
@@ -86,7 +85,6 @@ def procesar_pdf(archivo):
         texto = texto.split("Código Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
-
     buffer_desc = []
 
     for linea in lineas:
@@ -95,21 +93,33 @@ def procesar_pdf(archivo):
 
             numeros = re.findall(r"\d+,\d+", linea)
 
-            # ✅ 🎯 CANTIDAD DEFINITIVA (SIEMPRE correcta)
-            match_unidades = re.search(r"(\d+),\d+\s+unidades", linea)
+            # ✅ 🎯 CANTIDAD DEFINITIVA (anti error PyPDF)
+            match_unidades = re.search(r"(\d+),(\d+)\s+unidades", linea)
 
             if match_unidades:
-                cantidad = int(match_unidades.group(1))
+                entero = match_unidades.group(1)
+
+                # ✅ CLAVE: quedarse con últimos 3 dígitos
+                if len(entero) > 3:
+                    entero = entero[-3:]
+
+                cantidad = int(entero)
             else:
                 cantidad = 0
 
+            # =========================
             # ✅ PRODUCTO
+            # =========================
+
             if buffer_desc:
                 producto = " ".join(buffer_desc).strip()
             else:
                 producto = re.split(r"\d+,\d+", linea)[0].strip()
 
+            # =========================
             # ✅ IMPORTES
+            # =========================
+
             if len(numeros) >= 4:
                 precio = float(numeros[1].replace(",", "."))
                 subtotal = float(numeros[3].replace(",", "."))
@@ -121,6 +131,7 @@ def procesar_pdf(archivo):
             else:
                 precio = subtotal = total = 0
 
+            # limpieza producto
             producto = re.sub(r"\s+", " ", producto).strip()
 
             if len(producto) < 3:
@@ -152,7 +163,7 @@ def procesar_pdf(archivo):
 
 
 # =========================
-# ✅ GLOBAL
+# ✅ PROCESO GLOBAL
 # =========================
 
 if archivos:
@@ -165,6 +176,7 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
+        st.subheader("Resultado")
         st.dataframe(df)
 
         buffer = BytesIO()
@@ -175,3 +187,5 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
+    else:
+        st.warning("No se detectaron datos.")
