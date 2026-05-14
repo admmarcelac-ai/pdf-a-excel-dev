@@ -37,7 +37,7 @@ def procesar_pdf(archivo):
     cuit_receptor = cuits[1] if len(cuits) > 1 else ""
 
     # =========================
-    # ✅ RAZÓN EMISOR (FIX FINAL)
+    # ✅ RAZÓN EMISOR
     # =========================
 
     razon_emisor = ""
@@ -86,7 +86,6 @@ def procesar_pdf(archivo):
         texto = texto.split("Código Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
-
     buffer_desc = []
 
     for linea in lineas:
@@ -95,23 +94,32 @@ def procesar_pdf(archivo):
 
             numeros = re.findall(r"\d+,\d+", linea)
 
-            # ✅ CANTIDAD BIEN CORREGIDA (NUEVO FIX)
-            match_cant = re.search(r"(\d+),\d+\s+unidades", linea)
-
-            if match_cant:
-                cantidad = int(match_cant.group(1))
-            else:
-                cantidad = 0
-
-            # ✅ detectar PAPUS (para producto)
-            match_x = re.search(r"X\s*(\d+),", linea)
+            # ✅ PRIORIDAD 1: PAPUS
+            match_x = re.search(r"X\s*(\d+)", linea)
 
             if match_x:
+                numero_raw = match_x.group(1)
+
+                # 🔥 CLAVE: tomar solo últimos 2 dígitos
+                cantidad = int(numero_raw[-2:])
+
                 producto = " ".join(buffer_desc).strip()
+
             else:
+                # ✅ IRISITA
+                match_cant = re.search(r"(\d+),\d+\s+unidades", linea)
+
+                if match_cant:
+                    cantidad = int(match_cant.group(1))
+                else:
+                    cantidad = 0
+
                 producto = re.split(r"\d+,\d+", linea)[0].strip()
 
+            # =========================
             # ✅ IMPORTES
+            # =========================
+
             if len(numeros) >= 4:
                 precio = float(numeros[1].replace(",", "."))
                 subtotal = float(numeros[3].replace(",", "."))
@@ -154,7 +162,7 @@ def procesar_pdf(archivo):
 
 
 # =========================
-# ✅ PROCESO GLOBAL
+# ✅ GLOBAL
 # =========================
 
 if archivos:
@@ -167,7 +175,6 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
-        st.subheader("Resultado")
         st.dataframe(df)
 
         buffer = BytesIO()
@@ -178,5 +185,4 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
-    else:
-        st.warning("No se detectaron datos.")
+``
