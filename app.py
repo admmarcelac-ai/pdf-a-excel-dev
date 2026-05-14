@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - Múltiples Facturas")
+st.title("PDF a Excel - Multi Proveedor")
 
 archivos = st.file_uploader(
     "Subí uno o varios PDFs",
@@ -12,9 +12,8 @@ archivos = st.file_uploader(
     accept_multiple_files=True
 )
 
-todas_filas = []
-
 def procesar_pdf(archivo):
+
     filas = []
 
     reader = PdfReader(archivo)
@@ -27,11 +26,11 @@ def procesar_pdf(archivo):
     # ✅ DATOS GENERALES
     # =========================
 
-    fecha_match = re.search(r"\d{2}/\d{2}/\d{4}", texto)
-    fecha = fecha_match.group(0) if fecha_match else ""
+    fecha = re.search(r"\d{2}/\d{2}/\d{4}", texto)
+    fecha = fecha.group(0) if fecha else ""
 
-    tipo_match = re.search(r"FACTURA\s+([ABC])", texto)
-    tipo = tipo_match.group(1) if tipo_match else ""
+    tipo = re.search(r"FACTURA\s+([ABC])", texto)
+    tipo = tipo.group(1) if tipo else ""
 
     cuits = re.findall(r"\d{11}", texto)
     cuit_emisor = cuits[0] if len(cuits) > 0 else ""
@@ -44,72 +43,64 @@ def procesar_pdf(archivo):
     razon_emisor = ""
     razon_receptor = ""
 
-    lineas_texto = [l.strip() for l in texto.split("\n") if l.strip()]
-
-    for linea in lineas_texto:
+    for linea in texto.split("\n"):
         if ("SRL" in linea or "S.A" in linea or "SA" in linea):
 
-            if len(linea) > 4 and not linea.startswith("IVA"):
+            linea_limpia = linea.strip()
 
-                if not razon_emisor:
-                    razon_emisor = linea
+            if not razon_emisor:
+                razon_emisor = linea_limpia
 
-                elif not razon_receptor and linea != razon_emisor:
-                    if cuit_receptor in linea:
-                        razon_receptor = linea.replace(cuit_receptor, "").strip()
-                    else:
-                        razon_receptor = linea.strip()
+            elif not razon_receptor and linea_limpia != razon_emisor:
+                if cuit_receptor in linea_limpia:
+                    razon_receptor = linea_limpia.replace(cuit_receptor, "").strip()
+                else:
+                    razon_receptor = linea_limpia
 
     # =========================
-    # ✅ PV + Nº
+    # ✅ PV + NUMERO
     # =========================
 
     match = re.search(r"Punto de Venta:\s*Comp\.?\s*Nro:\s*(\d+)\s*(\d+)", texto)
 
-    if match:
-        punto_venta = match.group(1)
-        numero = match.group(2)
-    else:
-        punto_venta = ""
-        numero = ""
+    punto_venta = match.group(1) if match else ""
+    numero = match.group(2) if match else ""
 
     # =========================
-    # ✅ DETALLE
+    # ✅ DETALLE (MULTI FORMATO)
     # =========================
 
     if "Código Producto" in texto:
         texto = texto.split("Código Producto", 1)[1]
-    elif "Producto" in texto:
-        texto = texto.split("Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
-
-    descripcion = []
 
     for linea in lineas:
 
         if "unidades" in linea:
 
-            match_cant = re.search(r"X\s*(\d+),", linea)
-            if match_cant:
-                num = match_cant.group(1)
-                cantidad = int(num[-2:])
+            numeros = re.findall(r"\d+,\d+", linea)
+
+            # ✅ CANTIDAD (sirve para todos los formatos)
+            if numeros:
+                cantidad = int(float(numeros[0].replace(",", ".")))
             else:
                 cantidad = 0
 
-            numeros = re.findall(r"\d+,\d+", linea)
-
+            # ✅ IMPORTES
             if len(numeros) >= 4:
                 precio = float(numeros[1].replace(",", "."))
                 subtotal = float(numeros[3].replace(",", "."))
                 total = float(numeros[-1].replace(",", "."))
+            elif len(numeros) >= 3:
+                precio = float(numeros[1].replace(",", "."))
+                subtotal = float(numeros[2].replace(",", "."))
+                total = float(numeros[-1].replace(",", "."))
             else:
                 precio = subtotal = total = 0
 
-            producto = " ".join(descripcion).strip()
-
-            if "Subtotal" in producto:
-                producto = producto.split("Subtotal")[-1]
+            # ✅ PRODUCTO (todo antes del primer número)
+            producto = re.split(r"\d+,\d+", linea)[0].strip()
 
             filas.append({
                 "Fecha": fecha,
@@ -127,12 +118,6 @@ def procesar_pdf(archivo):
                 "Total c/ IVA": total
             })
 
-            descripcion = []
-
-        else:
-            if "Código" not in linea and "Subtotal" not in linea:
-                descripcion.append(linea)
-
     return filas
 
 
@@ -141,9 +126,11 @@ def procesar_pdf(archivo):
 # =========================
 
 if archivos:
+
+    todas_filas = []
+
     for pdf in archivos:
-        filas_pdf = procesar_pdf(pdf)
-        todas_filas.extend(filas_pdf)
+        todas_filas.extend(procesar_pdf(pdf))
 
     if todas_filas:
         df = pd.DataFrame(todas_filas)
@@ -155,7 +142,7 @@ if archivos:
         df.to_excel(buffer, index=False, engine="openpyxl")
 
         st.download_button(
-            "⬇️ Descargar Excel combinado",
+            "⬇️ Descargar Excel",
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
