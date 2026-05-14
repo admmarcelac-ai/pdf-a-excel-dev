@@ -185,4 +185,3 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
-``
