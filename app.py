@@ -13,11 +13,26 @@ if archivo:
     texto = reader.pages[0].extract_text()
 
     if texto:
-        # ✅ FECHA
+
+        # =========================
+        # ✅ DATOS GENERALES
+        # =========================
+
+        # Fecha
         fecha_match = re.search(r"\d{2}/\d{2}/\d{4}", texto)
         fecha = fecha_match.group(0) if fecha_match else ""
 
-        # ✅ PV + NUMERO (correcto AFIP)
+        # Tipo factura
+        tipo_match = re.search(r"FACTURA\s+([ABC])", texto)
+        tipo = tipo_match.group(1) if tipo_match else ""
+
+        # CUITs
+        cuit_encontrados = re.findall(r"\d{11}", texto)
+
+        cuit_emisor = cuit_encontrados[0] if len(cuit_encontrados) > 0 else ""
+        cuit_receptor = cuit_encontrados[1] if len(cuit_encontrados) > 1 else ""
+
+        # Punto de venta + número
         match = re.search(r"Punto de Venta:\s*Comp\.?\s*Nro:\s*(\d+)\s*(\d+)", texto)
 
         if match:
@@ -27,7 +42,10 @@ if archivo:
             punto_venta = ""
             numero = ""
 
-        # ✅ cortar encabezado
+        # =========================
+        # ✅ DETALLE PRODUCTOS
+        # =========================
+
         if "Código Producto" in texto:
             texto = texto.split("Código Producto", 1)[1]
         elif "Producto" in texto:
@@ -44,6 +62,7 @@ if archivo:
 
             if "unidades" in linea:
 
+                # cantidad
                 match_cant = re.search(r"X\s*(\d+),", linea)
                 if match_cant:
                     numero_raw = match_cant.group(1)
@@ -67,6 +86,9 @@ if archivo:
 
                 filas.append({
                     "Fecha": fecha,
+                    "Tipo": tipo,
+                    "CUIT Emisor": cuit_emisor,
+                    "CUIT Receptor": cuit_receptor,
                     "Punto de Venta": punto_venta,
                     "Número": numero,
                     "Producto": producto,
@@ -81,6 +103,10 @@ if archivo:
             else:
                 if "Código" not in linea and "Subtotal" not in linea:
                     descripcion.append(linea)
+
+        # =========================
+        # ✅ SALIDA
+        # =========================
 
         if filas:
             df = pd.DataFrame(filas)
