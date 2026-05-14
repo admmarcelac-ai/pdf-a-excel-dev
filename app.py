@@ -90,3 +90,55 @@ if archivo:
 
                 numeros = re.findall(r"\d+,\d+", linea)
 
+                if len(numeros) >= 4:
+                    precio = float(numeros[1].replace(",", "."))
+                    subtotal = float(numeros[3].replace(",", "."))
+                    total = float(numeros[-1].replace(",", "."))
+                else:
+                    precio = subtotal = total = 0
+
+                producto = " ".join(descripcion).strip()
+
+                if "Subtotal" in producto:
+                    producto = producto.split("Subtotal")[-1]
+
+                filas.append({
+                    "Fecha": fecha,
+                    "Tipo": tipo,
+                    "CUIT Emisor": cuit_emisor,
+                    "Razón Emisor": razon_emisor,
+                    "CUIT Receptor": cuit_receptor,
+                    "Razón Receptor": razon_receptor,
+                    "Punto de Venta": punto_venta,
+                    "Número": numero,
+                    "Producto": producto,
+                    "Cantidad": cantidad,
+                    "Precio Unitario": precio,
+                    "Subtotal": subtotal,
+                    "Total c/ IVA": total
+                })
+
+                descripcion = []
+
+            else:
+                if "Código" not in linea and "Subtotal" not in linea:
+                    descripcion.append(linea)
+
+        # =========================
+        # ✅ SALIDA
+        # =========================
+
+        if filas:
+            df = pd.DataFrame(filas)
+            st.dataframe(df)
+
+            buffer = BytesIO()
+            df.to_excel(buffer, index=False, engine="openpyxl")
+
+            st.download_button(
+                "Descargar Excel",
+                buffer.getvalue(),
+                "facturas.xlsx"
+            )
+        else:
+            st.warning("No se detectaron productos.")
