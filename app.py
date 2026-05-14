@@ -36,24 +36,40 @@ def procesar_pdf(archivo):
     cuit_emisor = cuits[0] if len(cuits) > 0 else ""
     cuit_receptor = cuits[1] if len(cuits) > 1 else ""
 
-    # ✅ FIJAR EMISOR CORRECTO (clave IRISITA)
-    if "Razón Social:" in texto:
-        match_rs = re.search(r"Razón Social:\s*([A-Z0-9 .]+)", texto)
-        if match_rs:
-            razon_emisor = match_rs.group(1).strip()
-        else:
-            razon_emisor = ""
-    else:
-        razon_emisor = ""
+    # =========================
+    # ✅ RAZÓN EMISOR (FIX DEFINITIVO)
+    # =========================
 
+    razon_emisor = ""
+
+    match_rs = re.search(
+        r"Razón Social:\s*([A-Z0-9 .]+?)\s*(Condición|Domicilio|CUIT|FACTURA)",
+        texto
+    )
+
+    if match_rs:
+        razon_emisor = match_rs.group(1).strip()
+
+    # fallback si no encuentra bien
+    if not razon_emisor:
+        for linea in texto.split("\n"):
+            if ("SRL" in linea or "S.A" in linea or "SA" in linea):
+                razon_emisor = linea.strip()
+                break
+
+    # =========================
     # ✅ RECEPTOR
+    # =========================
+
     razon_receptor = ""
+
     for linea in texto.split("\n"):
         if cuit_receptor in linea:
             razon_receptor = linea.replace(cuit_receptor, "").strip()
+            break
 
     # =========================
-    # ✅ PV + N°
+    # ✅ PV + Nº
     # =========================
 
     m = re.search(
@@ -71,7 +87,6 @@ def procesar_pdf(archivo):
         texto = texto.split("Código Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
-
     buffer_desc = []
 
     for linea in lineas:
@@ -80,29 +95,24 @@ def procesar_pdf(archivo):
 
             numeros = re.findall(r"\d+,\d+", linea)
 
-            # =========================
-            # ✅ CANTIDAD (PAPUS vs IRISITA)
-            # =========================
-
+            # ✅ detectar PAPUS (X)
             match_x = re.search(r"X\s*(\d+),", linea)
 
             if match_x:
-                # ✅ PAPUS (148 → 48)
                 num = match_x.group(1)
-                cantidad = int(num[-2:])
+                cantidad = int(num[-2:])  # corrige 148 → 48
+
                 producto = " ".join(buffer_desc).strip()
 
             else:
-                # ✅ IRISITA
-                cantidad = int(float(numeros[0].replace(",", ".")))
+                if numeros:
+                    cantidad = int(float(numeros[0].replace(",", ".")))
+                else:
+                    cantidad = 0
 
-                # producto en misma línea
                 producto = re.split(r"\d+,\d+", linea)[0].strip()
 
-            # =========================
-            # ✅ IMPORTES
-            # =========================
-
+            # ✅ importes
             if len(numeros) >= 4:
                 precio = float(numeros[1].replace(",", "."))
                 subtotal = float(numeros[3].replace(",", "."))
@@ -114,8 +124,7 @@ def procesar_pdf(archivo):
             else:
                 precio = subtotal = total = 0
 
-            # limpiar producto
-            producto = re.sub(r"\s+", " ", producto)
+            producto = re.sub(r"\s+", " ", producto).strip()
 
             if len(producto) < 3:
                 producto = "SIN DESCRIPCIÓN"
@@ -159,6 +168,7 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
+        st.subheader("Resultado")
         st.dataframe(df)
 
         buffer = BytesIO()
