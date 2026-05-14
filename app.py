@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - Multi Proveedor")
+st.title("PDF a Excel - Multi Proveedor PRO")
 
 archivos = st.file_uploader(
     "Subí uno o varios PDFs",
@@ -15,7 +15,6 @@ archivos = st.file_uploader(
 def procesar_pdf(archivo):
 
     filas = []
-
     reader = PdfReader(archivo)
     texto = reader.pages[0].extract_text()
 
@@ -33,11 +32,12 @@ def procesar_pdf(archivo):
     tipo = tipo.group(1) if tipo else ""
 
     cuits = re.findall(r"\d{11}", texto)
+
     cuit_emisor = cuits[0] if len(cuits) > 0 else ""
     cuit_receptor = cuits[1] if len(cuits) > 1 else ""
 
     # =========================
-    # ✅ RAZONES SOCIALES
+    # ✅ RAZONES (MEJORADO)
     # =========================
 
     razon_emisor = ""
@@ -46,28 +46,25 @@ def procesar_pdf(archivo):
     for linea in texto.split("\n"):
         if ("SRL" in linea or "S.A" in linea or "SA" in linea):
 
-            linea_limpia = linea.strip()
+            l = linea.strip()
 
             if not razon_emisor:
-                razon_emisor = linea_limpia
+                razon_emisor = l
 
-            elif not razon_receptor and linea_limpia != razon_emisor:
-                if cuit_receptor in linea_limpia:
-                    razon_receptor = linea_limpia.replace(cuit_receptor, "").strip()
-                else:
-                    razon_receptor = linea_limpia
+            elif not razon_receptor and l != razon_emisor:
+                razon_receptor = l.replace(cuit_receptor, "").strip()
 
     # =========================
-    # ✅ PV + NUMERO
+    # ✅ PV + N°
     # =========================
 
-    match = re.search(r"Punto de Venta:\s*Comp\.?\s*Nro:\s*(\d+)\s*(\d+)", texto)
+    m = re.search(r"Punto de Venta:\s*Comp\.?\s*Nro:\s*(\d+)\s*(\d+)", texto)
 
-    punto_venta = match.group(1) if match else ""
-    numero = match.group(2) if match else ""
+    punto_venta = m.group(1) if m else ""
+    numero = m.group(2) if m else ""
 
     # =========================
-    # ✅ DETALLE (MULTI FORMATO)
+    # ✅ DETALLE (CORRECTO)
     # =========================
 
     if "Código Producto" in texto:
@@ -75,19 +72,21 @@ def procesar_pdf(archivo):
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
 
+    buffer_desc = []
+
     for linea in lineas:
 
         if "unidades" in linea:
 
             numeros = re.findall(r"\d+,\d+", linea)
 
-            # ✅ CANTIDAD (sirve para todos los formatos)
+            # ✅ cantidad universal
             if numeros:
                 cantidad = int(float(numeros[0].replace(",", ".")))
             else:
                 cantidad = 0
 
-            # ✅ IMPORTES
+            # ✅ importes
             if len(numeros) >= 4:
                 precio = float(numeros[1].replace(",", "."))
                 subtotal = float(numeros[3].replace(",", "."))
@@ -99,8 +98,14 @@ def procesar_pdf(archivo):
             else:
                 precio = subtotal = total = 0
 
-            # ✅ PRODUCTO (todo antes del primer número)
-            producto = re.split(r"\d+,\d+", linea)[0].strip()
+            # ✅ PRODUCTO REAL (clave)
+            producto = " ".join(buffer_desc).strip()
+
+            # limpieza fuerte
+            producto = re.sub(r"\s+", " ", producto)
+
+            if len(producto) < 3:
+                producto = "SIN DESCRIPCIÓN"
 
             filas.append({
                 "Fecha": fecha,
@@ -118,31 +123,37 @@ def procesar_pdf(archivo):
                 "Total c/ IVA": total
             })
 
+            buffer_desc = []
+
+        else:
+            # ✅ filtro clave (evita basura)
+            if not any(x in linea for x in ["Código", "Subtotal", "IVA", "CAE", "%"]):
+                buffer_desc.append(linea)
+
     return filas
 
 
 # =========================
-# ✅ PROCESAR TODOS LOS PDFS
+# ✅ PROCESO GLOBAL
 # =========================
 
 if archivos:
 
-    todas_filas = []
+    todas = []
 
     for pdf in archivos:
-        todas_filas.extend(procesar_pdf(pdf))
+        todas.extend(procesar_pdf(pdf))
 
-    if todas_filas:
-        df = pd.DataFrame(todas_filas)
+    if todas:
+        df = pd.DataFrame(todas)
 
-        st.subheader("📊 Resultado combinado")
         st.dataframe(df)
 
         buffer = BytesIO()
         df.to_excel(buffer, index=False, engine="openpyxl")
 
         st.download_button(
-            "⬇️ Descargar Excel",
+            "Descargar Excel",
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
