@@ -13,15 +13,19 @@ if archivo:
     texto = reader.pages[0].extract_text()
 
     if texto:
-        # ✅ EXTRAER DATOS GENERALES (ANTES DE CORTAR)
-        fecha = re.search(r"\d{2}/\d{2}/\d{4}", texto)
-        fecha = fecha.group(0) if fecha else ""
+        # ✅ FECHA
+        fecha_match = re.search(r"\d{2}/\d{2}/\d{4}", texto)
+        fecha = fecha_match.group(0) if fecha_match else ""
 
-        pv = re.search(r"Punto de Venta:\s*(\d+)", texto)
-        punto_venta = pv.group(1) if pv else ""
+        # ✅ PV + NUMERO (correcto AFIP)
+        match = re.search(r"Punto de Venta:\s*Comp\.?\s*Nro:\s*(\d+)\s*(\d+)", texto)
 
-        nro = re.search(r"Comp\.?\s*Nro:\s*\d+\s*(\d+)", texto)
-        numero = nro.group(1) if nro else ""
+        if match:
+            punto_venta = match.group(1)
+            numero = match.group(2)
+        else:
+            punto_venta = ""
+            numero = ""
 
         # ✅ cortar encabezado
         if "Código Producto" in texto:
@@ -38,13 +42,11 @@ if archivo:
 
         for linea in lineas:
 
-            # ✅ detectar líneas reales de producto
             if "unidades" in linea:
 
-                # ✅ cantidad corregida
-                match = re.search(r"X\s*(\d+),", linea)
-                if match:
-                    numero_raw = match.group(1)
+                match_cant = re.search(r"X\s*(\d+),", linea)
+                if match_cant:
+                    numero_raw = match_cant.group(1)
                     cantidad = int(numero_raw[-2:])
                 else:
                     cantidad = 0
