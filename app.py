@@ -85,7 +85,6 @@ def procesar_pdf(archivo):
         texto = texto.split("Código Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
-
     buffer_desc = []
 
     for linea in lineas:
@@ -93,30 +92,34 @@ def procesar_pdf(archivo):
         if "unidades" in linea:
 
             # =========================
-            # ✅ 🎯 CANTIDAD FINAL PERFECTA
+            # ✅ 🎯 CANTIDAD FINAL REAL
             # =========================
+
+            cantidad = 0
 
             match = re.search(r"(.+?)unidades", linea)
 
             if match:
                 bloque = match.group(1)
 
-                # busco todos los números tipo 500,00
-                numeros_encontrados = re.findall(r"(\d+),\d+", bloque)
+                # todos los números tipo 120,00 / 500,00
+                numeros = re.findall(r"(\d+),\d+", bloque)
 
-                if numeros_encontrados:
-                    cantidad_str = numeros_encontrados[-1]  # ✅ el último SIEMPRE es el correcto
+                if numeros:
+                    cantidad_str = numeros[-1]  # ✅ SIEMPRE EL ÚLTIMO
 
-                    # ✅ corrección PAPUS (148 → 48)
-                    if " X " in linea and len(cantidad_str) >= 3:
-                        cantidad = int(cantidad_str[-2:])
-                    else:
+                    # 🔥 CASOS REALES CORREGIDOS
+                    if len(cantidad_str) <= 3:
+                        # ✅ normal (120, 300, 500)
                         cantidad = int(cantidad_str)
 
-                else:
-                    cantidad = 0
-            else:
-                cantidad = 0
+                    elif len(cantidad_str) == 4:
+                        # ✅ 4500 → 500
+                        cantidad = int(cantidad_str[-3:])
+
+                    else:
+                        # ✅ 70300 → 300
+                        cantidad = int(cantidad_str[-3:])
 
             # =========================
             # ✅ PRODUCTO
