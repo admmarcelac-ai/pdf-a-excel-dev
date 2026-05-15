@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - FINAL PRO")
+st.title("PDF a Excel - FAC COTI")
 
 archivos = st.file_uploader(
     "Subí PDFs",
