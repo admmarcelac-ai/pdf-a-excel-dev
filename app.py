@@ -85,36 +85,44 @@ def procesar_pdf(archivo):
         texto = texto.split("Código Producto", 1)[1]
 
     lineas = [l.strip() for l in texto.split("\n") if l.strip()]
+
     buffer_desc = []
 
     for linea in lineas:
 
         if "unidades" in linea:
 
-            numeros = re.findall(r"\d+,\d+", linea)
-
             # =========================
-            # ✅ CANTIDAD UNIVERSAL
+            # ✅ 🎯 CANTIDAD FINAL PERFECTA
             # =========================
 
-            match_unidades = re.search(r"(\d+),(\d+)\s+unidades", linea)
+            match = re.search(r"(.+?)unidades", linea)
 
-            if match_unidades:
-                entero = match_unidades.group(1)
+            if match:
+                bloque = match.group(1)
 
-                # 🔥 CASO PAPUS (148, 136, 112)
-                if len(entero) >= 3:
-                    cantidad = int(entero[-2:])
+                # busco todos los números tipo 500,00
+                numeros_encontrados = re.findall(r"(\d+),\d+", bloque)
+
+                if numeros_encontrados:
+                    cantidad_str = numeros_encontrados[-1]  # ✅ el último SIEMPRE es el correcto
+
+                    # ✅ corrección PAPUS (148 → 48)
+                    if " X " in linea and len(cantidad_str) >= 3:
+                        cantidad = int(cantidad_str[-2:])
+                    else:
+                        cantidad = int(cantidad_str)
 
                 else:
-                    cantidad = int(entero)
-
+                    cantidad = 0
             else:
                 cantidad = 0
 
             # =========================
             # ✅ PRODUCTO
             # =========================
+
+            numeros_linea = re.findall(r"\d+,\d+", linea)
 
             if buffer_desc:
                 producto = " ".join(buffer_desc).strip()
@@ -125,14 +133,14 @@ def procesar_pdf(archivo):
             # ✅ IMPORTES
             # =========================
 
-            if len(numeros) >= 4:
-                precio = float(numeros[1].replace(",", "."))
-                subtotal = float(numeros[3].replace(",", "."))
-                total = float(numeros[-1].replace(",", "."))
-            elif len(numeros) >= 3:
-                precio = float(numeros[1].replace(",", "."))
-                subtotal = float(numeros[2].replace(",", "."))
-                total = float(numeros[-1].replace(",", "."))
+            if len(numeros_linea) >= 4:
+                precio = float(numeros_linea[1].replace(",", "."))
+                subtotal = float(numeros_linea[3].replace(",", "."))
+                total = float(numeros_linea[-1].replace(",", "."))
+            elif len(numeros_linea) >= 3:
+                precio = float(numeros_linea[1].replace(",", "."))
+                subtotal = float(numeros_linea[2].replace(",", "."))
+                total = float(numeros_linea[-1].replace(",", "."))
             else:
                 precio = subtotal = total = 0
 
@@ -167,7 +175,7 @@ def procesar_pdf(archivo):
 
 
 # =========================
-# ✅ GLOBAL
+# ✅ PROCESO GLOBAL
 # =========================
 
 if archivos:
@@ -180,6 +188,7 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
+        st.subheader("Resultado")
         st.dataframe(df)
 
         buffer = BytesIO()
@@ -190,3 +199,5 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
+    else:
+        st.warning("No se detectaron datos.")
