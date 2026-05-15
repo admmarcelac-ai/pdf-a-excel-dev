@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - FINAL VALIDADO")
+st.title("PDF a Excel - FINAL PRO")
 
 archivos = st.file_uploader(
     "Subí PDFs",
@@ -92,7 +92,7 @@ def procesar_pdf(archivo):
         if "unidades" in linea:
 
             # =========================
-            # ✅ CANTIDAD BASE
+            # ✅ CANTIDAD DESDE TEXTO
             # =========================
 
             cantidad = 0
@@ -146,7 +146,6 @@ def procesar_pdf(archivo):
             if precio > 0:
                 cantidad_calc = round(subtotal / precio)
 
-                # si difiere → usar la calculada
                 if cantidad == 0 or abs(cantidad - cantidad_calc) > 1:
                     cantidad = cantidad_calc
 
@@ -164,7 +163,6 @@ def procesar_pdf(archivo):
             else:
                 validacion = "SIN PRECIO"
 
-            # limpieza producto
             producto = re.sub(r"\s+", " ", producto).strip()
 
             if len(producto) < 3:
@@ -172,11 +170,11 @@ def procesar_pdf(archivo):
 
             filas.append({
                 "Fecha": fecha,
-                "Tipo": tipo,
                 "CUIT Emisor": cuit_emisor,
                 "Razón Emisor": razon_emisor,
                 "CUIT Receptor": cuit_receptor,
                 "Razón Receptor": razon_receptor,
+                "Tipo": tipo,
                 "Punto de Venta": punto_venta,
                 "Número": numero,
                 "Producto": producto,
@@ -197,7 +195,7 @@ def procesar_pdf(archivo):
 
 
 # =========================
-# ✅ GLOBAL
+# ✅ PROCESO GLOBAL
 # =========================
 
 if archivos:
@@ -210,6 +208,26 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
+        # ✅ ORDEN FINAL DE COLUMNAS
+        columnas_ordenadas = [
+            "Fecha",
+            "CUIT Emisor",
+            "Razón Emisor",
+            "CUIT Receptor",
+            "Razón Receptor",
+            "Tipo",
+            "Punto de Venta",
+            "Número",
+            "Producto",
+            "Cantidad",
+            "Precio Unitario",
+            "Subtotal",
+            "Total c/ IVA",
+            "Validación"
+        ]
+
+        df = df[columnas_ordenadas]
+
         st.dataframe(df)
 
         buffer = BytesIO()
@@ -220,3 +238,6 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
+    else:
+        st.warning("No se detectaron datos.")
+``
