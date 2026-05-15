@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - PRO FINAL ESTABLE")
+st.title("PDF a Excel - FINAL DEFINITIVO")
 
 archivos = st.file_uploader(
     "Subí PDFs",
@@ -93,17 +93,22 @@ def procesar_pdf(archivo):
 
             numeros = re.findall(r"\d+,\d+", linea)
 
-            # ✅ 🎯 CANTIDAD DEFINITIVA (anti error PyPDF)
+            # =========================
+            # ✅ CANTIDAD UNIVERSAL
+            # =========================
+
             match_unidades = re.search(r"(\d+),(\d+)\s+unidades", linea)
 
             if match_unidades:
                 entero = match_unidades.group(1)
 
-                # ✅ CLAVE: quedarse con últimos 3 dígitos
-                if len(entero) > 3:
-                    entero = entero[-3:]
+                # 🔥 CASO PAPUS (148, 136, 112)
+                if len(entero) >= 3:
+                    cantidad = int(entero[-2:])
 
-                cantidad = int(entero)
+                else:
+                    cantidad = int(entero)
+
             else:
                 cantidad = 0
 
@@ -131,7 +136,6 @@ def procesar_pdf(archivo):
             else:
                 precio = subtotal = total = 0
 
-            # limpieza producto
             producto = re.sub(r"\s+", " ", producto).strip()
 
             if len(producto) < 3:
@@ -163,7 +167,7 @@ def procesar_pdf(archivo):
 
 
 # =========================
-# ✅ PROCESO GLOBAL
+# ✅ GLOBAL
 # =========================
 
 if archivos:
@@ -176,7 +180,6 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
-        st.subheader("Resultado")
         st.dataframe(df)
 
         buffer = BytesIO()
@@ -187,5 +190,3 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
-    else:
-        st.warning("No se detectaron datos.")
