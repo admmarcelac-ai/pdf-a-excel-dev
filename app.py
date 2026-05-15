@@ -240,4 +240,3 @@ if archivos:
         )
     else:
         st.warning("No se detectaron datos.")
-``
