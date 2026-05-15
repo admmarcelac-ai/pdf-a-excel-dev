@@ -4,7 +4,7 @@ import pandas as pd
 from io import BytesIO
 import re
 
-st.title("PDF a Excel - FINAL DEFINITIVO")
+st.title("PDF a Excel - FINAL VALIDADO")
 
 archivos = st.file_uploader(
     "Subí PDFs",
@@ -92,7 +92,7 @@ def procesar_pdf(archivo):
         if "unidades" in linea:
 
             # =========================
-            # ✅ 🎯 CANTIDAD FINAL REAL
+            # ✅ CANTIDAD BASE
             # =========================
 
             cantidad = 0
@@ -101,24 +101,16 @@ def procesar_pdf(archivo):
 
             if match:
                 bloque = match.group(1)
-
-                # todos los números tipo 120,00 / 500,00
                 numeros = re.findall(r"(\d+),\d+", bloque)
 
                 if numeros:
-                    cantidad_str = numeros[-1]  # ✅ SIEMPRE EL ÚLTIMO
+                    cantidad_str = numeros[-1]
 
-                    # 🔥 CASOS REALES CORREGIDOS
                     if len(cantidad_str) <= 3:
-                        # ✅ normal (120, 300, 500)
                         cantidad = int(cantidad_str)
-
                     elif len(cantidad_str) == 4:
-                        # ✅ 4500 → 500
                         cantidad = int(cantidad_str[-3:])
-
                     else:
-                        # ✅ 70300 → 300
                         cantidad = int(cantidad_str[-3:])
 
             # =========================
@@ -147,6 +139,32 @@ def procesar_pdf(archivo):
             else:
                 precio = subtotal = total = 0
 
+            # =========================
+            # ✅ 🔥 CORRECCIÓN CONTABLE
+            # =========================
+
+            if precio > 0:
+                cantidad_calc = round(subtotal / precio)
+
+                # si difiere → usar la calculada
+                if cantidad == 0 or abs(cantidad - cantidad_calc) > 1:
+                    cantidad = cantidad_calc
+
+            # =========================
+            # ✅ ✅ VALIDACIÓN FINAL
+            # =========================
+
+            if precio > 0:
+                diferencia = round((cantidad * precio) - subtotal, 2)
+
+                if abs(diferencia) <= 1:
+                    validacion = "OK"
+                else:
+                    validacion = "ERROR"
+            else:
+                validacion = "SIN PRECIO"
+
+            # limpieza producto
             producto = re.sub(r"\s+", " ", producto).strip()
 
             if len(producto) < 3:
@@ -165,7 +183,8 @@ def procesar_pdf(archivo):
                 "Cantidad": cantidad,
                 "Precio Unitario": precio,
                 "Subtotal": subtotal,
-                "Total c/ IVA": total
+                "Total c/ IVA": total,
+                "Validación": validacion
             })
 
             buffer_desc = []
@@ -178,7 +197,7 @@ def procesar_pdf(archivo):
 
 
 # =========================
-# ✅ PROCESO GLOBAL
+# ✅ GLOBAL
 # =========================
 
 if archivos:
@@ -191,7 +210,6 @@ if archivos:
     if todas:
         df = pd.DataFrame(todas)
 
-        st.subheader("Resultado")
         st.dataframe(df)
 
         buffer = BytesIO()
@@ -202,5 +220,3 @@ if archivos:
             buffer.getvalue(),
             "facturas_combinadas.xlsx"
         )
-    else:
-        st.warning("No se detectaron datos.")
